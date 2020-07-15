@@ -1,2 +1,0 @@
-# vox-web
-Vox Website
