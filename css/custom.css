@@ -189,3 +189,40 @@
   font-weight: 900;
   font-style: normal;
 }        
+
+ul{
+  padding-bottom: 10px
+}
+
+li {
+  list-style: none;
+  position: relative;
+  margin-bottom: 14px;
+  padding-left: 20px;
+  line-height: 1.6
+}
+
+li:before {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  left: 2px;
+  top: 6px;
+  border-radius: 50%;
+  background:#BCC8D2
+}
+
+.slide.whiteSlide{
+  color: #304757
+}
+
+.p, blockquote, p{
+  line-height: 1.6;
+  margin-bottom: 14px
+}
+
+a{
+  color: #3A9EC3;
+  font-weight: 600
+}
