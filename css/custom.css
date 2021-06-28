@@ -193,38 +193,38 @@
 /* #### For Privacy Policy #### */
 
 ul{
-  padding-bottom: 10px
+  padding-bottom: 10px  !important
 }
 
 li {
-  list-style: none;
-  position: relative;
-  margin-bottom: 14px;
-  padding-left: 20px;
-  line-height: 1.6
+  list-style: none  !important;
+  position: relative  !important;
+  margin-bottom: 14px  !important;
+  padding-left: 20px  !important;
+  line-height: 1.6  !important
 }
 
 li:before {
-  content: "";
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  left: 2px;
-  top: 6px;
-  border-radius: 50%;
-  background:#BCC8D2
+  content: ""  !important;
+  position: absolute  !important;
+  width: 6px  !important;
+  height: 6px  !important;
+  left: 2px  !important;
+  top: 6px  !important;
+  border-radius: 50%  !important;
+  background:#BCC8D2  !important
 }
 
 .slide.whiteSlide{
-  color: #304757
+  color: #304757  !important
 }
 
 .p, blockquote, p{
-  line-height: 1.6;
-  margin-bottom: 14px
+  line-height: 1.6  !important;
+  margin-bottom: 14px  !important
 }
 
 a{
-  color: #3A9EC3;
-  font-weight: 600
+  color: #3A9EC3  !important;
+  font-weight: 600  !important
 }
