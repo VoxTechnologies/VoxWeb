@@ -1,0 +1,22 @@
+/* Panel Top 06 */
+.button.actionButton{
+	background: transparent;
+	height: 36px;
+	width: 28px;
+	padding: 6px;
+	box-shadow: none;
+}
+.button.actionButton svg{
+	width: 23px;
+  height: 23px;
+}
+.panel{
+	padding: 10px 30px 0px 30px;
+}
+.panel .sections>div{
+  height: 70px;
+}
+.sidebar{
+	background: #95A8B8;
+  color: #F9FBFC;
+}

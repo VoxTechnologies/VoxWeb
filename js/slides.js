@@ -1,7 +1,7 @@
 /*
 
    _____ _       _                 _  _____
-  / ___/| (*)   | |               | |/ ___/  v 4.2.5
+  / ___/| (*)   | |               | |/ ___/  v 5.2.1
  | (___ | |_  __| | ___ ____      | | (___
   \___ \| | |/ _` |/ _ / __/  _   | |\___ \
   ____) | | | (_| |  __\__ \ | |__| |____) |
@@ -9,11 +9,11 @@
 
 
 This file contains scripts required for the proper functionality and display
-of your Slides Project. It also requires plugins.js and jquery-3.3.1 to run this script properly.
+of your Slides Project. It also requires plugins.js and jquery-3.5.1 to run this script properly.
 
 https://designmodo.com/slides/
 
-*/
+*/ 
 
 window.inAction = 1;
 window.allowSlide = 1;
@@ -71,7 +71,7 @@ $(document).ready(function() { "use strict";
     //fast
     window.slideSpeed = 700;
     window.cleanupDelay = 1200;
-    window.effectSpeed = 700;
+    window.effectSpeed = 800;
     window.scrollSpeed = 0.35;
     window.effectOffset = 400;
   } else if ($body.hasClass('slow')){
@@ -79,7 +79,6 @@ $(document).ready(function() { "use strict";
     window.slideSpeed = 1400;
     window.cleanupDelay = 2000;
     window.effectSpeed = 1400;
-    window.effectOffset = 400;
     window.scrollSpeed = .8;
     window.effectOffset = 600;
   }
@@ -169,10 +168,17 @@ $(document).ready(function() { "use strict";
   if (window.preload){
     var imgs = [];
     $("*").each(function() {
-      if($(this).css("background-image") !== "none") {
-        imgs.push($(this).css("background-image").replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, ''));
-      } else if ($(this).is('img')){
-        imgs.push($(this).attr("src"));
+      var img_path,
+          $img = $(this);
+
+      if( $img.css("background-image") !== "none") {
+        img_path = $img.css("background-image").replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, '');
+      } else if ($img.is('img')){
+        img_path = $img.attr("src");
+      }
+      // if( !/(linear-|data:).+/.test(img_path) )
+      if( img_path && !/(repeating-)?(linear|radial)-gradient.+/.test(img_path) ) {
+        imgs.push(img_path);
       }
     });
 
@@ -204,15 +210,6 @@ $(document).ready(function() { "use strict";
 
   //Initiate slide
   showSlide(window.stage);
-
-  $('.grid.masonry').masonry({
-    itemSelector: 'li',
-    transitionDuration: '0.1s'
-  });
-
-  $('.grid.masonry').imagesLoaded().progress( function() {
-    $('.grid.masonry').masonry('layout');
-  });
 
   //On page load
   if (!window.preload || !window.images || window.loaded) {
@@ -298,6 +295,7 @@ $(document).ready(function() { "use strict";
       $body.removeClassByPrefix("stage-").addClass('stage-'+window.stage);
     }
 
+
     //white slide?
     if ( newSlide.hasClass('whiteSlide') ){
       $body.addClass('whiteSlide');
@@ -340,7 +338,6 @@ $(document).ready(function() { "use strict";
 
       setTimeout(function(){
         if (currenSlideIndex !== requested){
-
           if (window.animationLoop === 0) {
             currenSlide.removeClass('active');
           } else {
@@ -358,19 +355,16 @@ $(document).ready(function() { "use strict";
         newSlide.addClass('animate');
       },window.slideSpeed - window.effectOffset);
 
+
       //clear element animation on done
       if (window.animationLoop != 0) {
         $('.done').removeClass('done');
       }
 
       $(".slide.selected [class*='ae-']").one('webkitTransitionEnd oTransitionEnd msTransitionEnd transitionend', function(){
-        $(this).addClass("done");
+        var $this = $(this);
+        setTimeout(function(){ $this.addClass("done"); },window.effectOffset);
       });
-
-      // clearTimeout(window.clearElementAnimation);
-      // window.clearElementAnimation = setTimeout(function(){
-      //   $(".slide.selected [class*='ae-']").addClass('done');
-      // }, window.slideSpeed + window.effectSpeed + window.cleanupDelay);
     }
     //end showSlide();
   }
@@ -399,7 +393,7 @@ $(document).ready(function() { "use strict";
       var requestedElement = $('.slide:eq('+ (window.stage - 1) +')'),
           finalPosition = $(requestedElement).offset().top;
 
-      $('html,body').stop().clearQueue().animate({scrollTop:finalPosition},1000);
+      $('html,body').stop().clearQueue().animate({scrollTop:finalPosition},window.effectSpeed);
     } else {
       if ((n !== window.stage)&&( n <= window.stages)){
         if (window.inAction !== 1){
@@ -413,12 +407,25 @@ $(document).ready(function() { "use strict";
           }
 
           setTimeout(function(){
+            window.stage = n;
             showSlide(window.stage);
             setTimeout(function(){ window.inAction = 0; }, window.slideSpeed);
           }, delay);
         }
       }
     }
+
+    //stop iframe autoplay
+    $("iframe.autoplay").each(function(){
+      var iframeSrc = $(this).attr('src').replace("?autoplay=1","?").replace("&autoplay=1","");
+      $(this).attr('src', iframeSrc);
+    });
+
+    //stop videos
+    $("video.autoplay").each(function(){
+      $(this)[0].pause();
+      $(this)[0].currentTime = 0;
+    });
   };
 
   $('.nextSlide').on('click', function(){
@@ -504,7 +511,18 @@ $(document).ready(function() { "use strict";
   var eventCount = 0,
       eventCountStart;
 
-  $('html,body').on('DOMMouseScroll mousewheel scroll', function(event){
+  // remember start point of a touchmove to calculate touch move distance
+  var deltaY;
+  $('body').on('touchstart', function(event){
+      deltaY = event.touches[0].clientY;
+  });
+
+  $('body').on('DOMMouseScroll mousewheel scroll touchend', function(event){
+    // count touch move distance
+    if(event.type=="touchend"){
+      event.deltaY = event.changedTouches[0].clientY - deltaY;
+      event.deltaFactor = 1;
+    }
     var $currentSection = $('.slide.selected .content'),
         scrollsize = Math.ceil(Math.abs(event.deltaY) * event.deltaFactor),
         browserScrollRate = (window.isFirefox) ? 2 : 1,
@@ -560,7 +578,7 @@ $(document).ready(function() { "use strict";
         } else {
           window.allowSlide = 0;
         }
-
+  
         //hide panels on scroll
         if (window.panelsToHide) {
           if (scrollDirection === "down" && $currentSection.scrollTop() > 0) {
@@ -621,7 +639,6 @@ $(document).ready(function() { "use strict";
 
         //should we even..
         if ((scrollDirection === "down" && window.stage !== window.stages)||(scrollDirection === "up" && window.stage !== 1)){
-
           //ok let's go
           if (window.inAction !== 1){
             if (scrollDirection === "down"){
@@ -639,7 +656,7 @@ $(document).ready(function() { "use strict";
   //scroll or simplified mobile
   if ( (window.isMobile && window.isSimplifiedMobile) || window.isScroll ){
     $(window).on('DOMMouseScroll mousewheel scroll touchmove load', function(){
-      updateScroll();
+      if (window.updateScroll != 0) updateScroll();
     });
   }
 
@@ -725,8 +742,6 @@ $(document).ready(function() { "use strict";
                 $element.find("[class*='ae-']").addClass('done');
               }, window.effectSpeed + window.cleanupDelay);
             }
-
-            updateNavigation();
           }
 
           if (!window.firstTimeTrigger){
@@ -737,20 +752,25 @@ $(document).ready(function() { "use strict";
         } else {
           $element.removeClass('selected');
         }
+
+        updateNavigation();
       }
 
       //Parallax background
-      if ((scale > -1 && scale < 1) && !(window.allowParallaxOnMobile && window.isMobile)) {
-        if ($element.hasClass('parallax') || $element.find('.parallax-element')){
+      if (!window.isMobile || window.isMobile && window.allowParallaxOnMobile) {
+        if ((scale > -1 && scale < 1)) {
 
-          $element.find('.parallax-element').each(function() {
-            var $el = $(this),
-                velocity = parseInt($el.data('parallax-velocity')) ? parseInt($el.data('parallax-velocity')) : 50,
-                precentage =  scale * velocity;
+          if ($element.hasClass('parallax') || $element.find('.parallax-element')){
 
-            if (velocity > 100) velocity = 100;
-            $el.css('-webkit-transform',"translate3d(0, " + precentage + "%, 0)").css('transform',"translate3d(0, " + precentage + "%, 0)");
-          });
+            $element.find('.parallax-element').each(function() {
+              var $el = $(this),
+                  velocity = parseInt($el.data('parallax-velocity')) ? parseInt($el.data('parallax-velocity')) : 50,
+                  precentage =  scale * velocity;
+
+              if (velocity > 100) velocity = 100;
+              $el.css('-webkit-transform',"translate3d(0, " + precentage + "%, 0)").css('transform',"translate3d(0, " + precentage + "%, 0)");
+            });
+          }
         }
       }
     });
@@ -759,12 +779,18 @@ $(document).ready(function() { "use strict";
     if (window.isAnimated == "animateOnEvent") {
 
       if (!window.preload) {
-        $("[class*='ae-']").each(function(i, element) {
+        $("[class*='ae-']:not(.done):not(.do)").each(function(i, element) {
           var $ae = $(element);
           if (isElementInView($ae)) {
             $ae.addClass("do").one('webkitAnimationEnd oanimationend msAnimationEnd animationend', function(){
-              $(this).removeClassByPrefix('ae-').removeClass("do").addClass("done");
+              $(this).removeClass("do").addClass("done");
             });
+          } else {
+            if (window.animationLoop == 1) {
+              if (!isElementInView($ae)) {
+                $ae.removeClass('done do');
+              }
+            }
           }
         });
       } else if (window.loaded){
@@ -890,6 +916,8 @@ $(document).ready(function() { "use strict";
 
 
 
+
+
 /***
  *      _____                 _
  *     |  __ \               | |
@@ -927,11 +955,12 @@ $(document).ready(function() { "use strict";
           var totalWidth = 0;
 
           desktop.children().each(function(){
-            if ( $(this).outerWidth() > $(this).children().outerWidth() ){
-              totalWidth += Math.round($(this).outerWidth());
-            } else {
-              totalWidth += Math.round($(this).children().outerWidth());
-            }
+            // if ( $(this).outerWidth() > $(this).children().outerWidth() ){
+            //   totalWidth += Math.round($(this).outerWidth());
+            // } else {
+            //   totalWidth += Math.round($(this).children().outerWidth());
+            // }
+            totalWidth += Math.round($(this).children().outerWidth());
           });
 
           // if width of space is not enough or we are on mobile
@@ -988,6 +1017,39 @@ $(document).ready(function() { "use strict";
     }
   }
 
+  //scroll on mobile
+  if (window.isMobile) {
+
+    var $currentSection = window.isScroll ? $(document) : $('.slide .content'),
+        currentSectionHeight = $currentSection.find('.container').outerHeight(),
+        lastScroll = 0,
+        scrollHeight = Math.max(
+          document.body.scrollHeight, document.documentElement.scrollHeight,
+          document.body.offsetHeight, document.documentElement.offsetHeight,
+          document.body.clientHeight, document.documentElement.clientHeight
+        ),
+        hidePanelTop = $('.panel.top.hideOnScroll'),
+        hidePanelBottom = $('.panel.bottom.hideOnScroll');
+
+    $currentSection.on('scroll', function(event){
+
+      if (window.inAction) return;
+
+      var $currentSection = $(this),
+          scrollTop = $(this).scrollTop(),
+          scrollDirection = (scrollTop > lastScroll) ? "down" : "up";
+
+      if (scrollDirection === "down" && $currentSection.scrollTop() > 0) {
+        if (hidePanelTop) $body.addClass('hidePanel-top');
+        if (hidePanelBottom) $body.addClass('hidePanel-bottom');
+      } else if (scrollDirection === "up"){
+        $body.removeClass('hidePanel-top hidePanel-bottom');
+      }
+
+      lastScroll = scrollTop;
+    });
+  }
+
 
 
 
@@ -1020,14 +1082,14 @@ $(document).ready(function() { "use strict";
       return;
     }
 
-    /* [ ← ] */
-    if (e.keyCode === 37){
+    /* [ ← ] & [ PgUp ] */
+    if (e.keyCode === 37 || e.keyCode === 33){
       e.preventDefault();
       if (window.horizontalMode){ window.changeSlide('decrease'); }
     }
 
-    /* [ ↑ ] */
-    if (e.keyCode === 38){
+    /* [ ↑ ] & [ PgUp ] */
+    if (e.keyCode === 38 || e.keyCode === 33){
       if (!window.horizontalMode){
         e.preventDefault();
         window.changeSlide('decrease');
@@ -1041,16 +1103,16 @@ $(document).ready(function() { "use strict";
       }
     }
 
-    /* [ → ] */
-    if (e.keyCode === 39){
+    /* [ → ] & [ PgDwn ] */
+    if (e.keyCode === 39 || e.keyCode === 34){
       if (window.horizontalMode){
         e.preventDefault();
         window.changeSlide('increase');
       }
     }
 
-    /* [ ↓ ] */
-    if (e.keyCode === 40){
+    /* [ ↓ ] & [ PgDwn ] */
+    if (e.keyCode === 40 || e.keyCode === 34){
       if (!window.horizontalMode) {
         e.preventDefault();
         window.changeSlide('increase');
@@ -1167,8 +1229,10 @@ $(document).ready(function() { "use strict";
           window.location.hash = hashLink;
         }
       } else {
-        window.stage = $('.slide').index(requestedElement) + 1;
-        showSlide(window.stage);
+        if(!($(this).hasClass("toLastSlide") && $("body").hasClass("lastSlide"))){
+          window.stage = $('.slide').index(requestedElement) + 1;
+          showSlide(window.stage);
+        }
       }
       hideSidebar();
     }
@@ -1183,9 +1247,9 @@ $(document).ready(function() { "use strict";
           $(element).find('li.selected').removeClass('selected');
 
           var $selectedSlide = $('.slide.selected'),
-              parentSlide = $selectedSlide.data('parent-slide-id'),
+              parentSlide = parseInt($selectedSlide.data('parent-slide-id')),
               selectedIndex = $selectedSlide.index('.slide:not(.exclude)');
-              
+
           if (selectedIndex !== -1) {
             $(element).find('li').eq(selectedIndex).addClass('selected');
           } else if (parentSlide) {
@@ -1263,14 +1327,18 @@ $(document).ready(function() { "use strict";
       window.sidebarShown = 0;
       window.allowSlide = 1;
     }
+
   }
 
   //Hide on click outside
   $(document).on('mouseup touchstart', function (e){
-    var container = $(".sidebarShown .sidebar, .dropdownTrigger");
-    if (!container.is(e.target) && container.has(e.target).length === 0 && window.hideSidebarOnBodyClick) {
+    var container = $(".sidebarShown .sidebar, .dropdownTrigger"),
+        clickTarget = e.target;
+
+    if (!container.is(clickTarget) && container.has(clickTarget).length === 0 && window.hideSidebarOnBodyClick && $(clickTarget).hasClass('ignoreBodyClick') === false) {
       hideSidebar();
     }
+    $(window).trigger('sidebarHidden');
   });
 
   //Hide on .close Click
@@ -1298,12 +1366,17 @@ $(document).ready(function() { "use strict";
 
 
   $('.popupTrigger[data-popup-id]').on('click', function(){
-    var popupID = $(this).data('popup-id');
-    window.showPopup(popupID);
+    var popupID   = $(this).data('popup-id'),
+        focusOnID = $(this).data('popup-focus-input'); // ID of input to focus on after showing popup
+    if(typeof(focusOnID)!="string" && focusOnID!=""){
+        focusOnID = false;
+    }
+    window.showPopup(popupID, focusOnID);
   });
 
-  window.showPopup = function(id){
+  window.showPopup = function(id, focusOn){
     var popupID = id,
+        focusOnID = focusOn,
         element = $('.popup[data-popup-id="' + popupID + '"]'),
         isAnimated = element.hasClass('animated');
 
@@ -1314,16 +1387,33 @@ $(document).ready(function() { "use strict";
       //set a trigger
       $(window).trigger('popupShown');
 
-      if (isAnimated){
-        setTimeout(function(){
-          $(element).addClass('animate active');
+      function animatePopup() {
+        var dfd = jQuery.Deferred();
+        if (isAnimated){
+          setTimeout(function(){
+            $(element).addClass('animate active');
 
-          clearTimeout(window.clearPopupElementAnimation);
-          window.clearPopupElementAnimation = setTimeout(function(){
-            $(element).find("[class*='ae-']").addClass('done');
-          }, window.effectSpeed + window.cleanupDelay);
-        },100);
+            clearTimeout(window.clearPopupElementAnimation);
+            window.clearPopupElementAnimation = setTimeout(function(){
+              $(element).find("[class*='ae-']").addClass('done');
+              dfd.resolve( "done" );
+            }, window.effectSpeed + window.cleanupDelay);
+          },100);
+        }else{
+          dfd.resolve( "done" );
+        }
+        return dfd.promise();
       }
+       
+      $.when( animatePopup() ).then(
+        function( status ) { // done
+          if(focusOnID){
+            $(element).find("#"+focusOnID).focus();
+          }
+        },
+        function( status ) { }, // fail
+        function( status ) { } // progress
+      );
 
       $html.addClass('popupShown popup_' + popupID);
       $(element).find('.content').scrollTop(0);
@@ -1333,20 +1423,41 @@ $(document).ready(function() { "use strict";
       if (!window.popupShown) window.popupShown = [];
       window.popupShown.push(popupID);
 
-      //Autoplay Iframe
-      if ($(element).hasClass('autoplay')){
-        var $element = $(element),
-            iframe = $element.find('iframe'),
-            HTML5video = $element.find('video');
-
-        if ( iframe.length > 0  ) {
-          var iframeSrc = $(iframe).attr('src') ? $(iframe).attr('src') : $(iframe).data('src'),
+      //Autoplay Iframe, replace data-src to src
+      var $element = $(element),
+          iframes = $element.find('iframe'),
+          HTML5videos = $element.find('video');
+      if ( iframes.length > 0  ) {
+        iframes.each(function(){
+          var iframe = $(this),
+              iframeSrc = iframe.attr('src') ? iframe.attr('src') : iframe.data('src'),
               symbol = (iframeSrc.indexOf('?') > -1) ? "&" : "?";
 
-          $(iframe).attr('src',iframeSrc + symbol + "autoplay=1");
-        } else if (HTML5video.length > 0){
-          $(HTML5video)[0].play();
-        }
+          if ($(element).hasClass('autoplay') || iframe.hasClass("autoplay") && iframe.closest(".slider li.selected").length){
+              iframe.attr("allow","autoplay");
+              iframe.attr('src',iframeSrc + symbol + "autoplay=1");
+          }else{
+            if(!iframe.attr('src')){
+              iframe.attr('src',iframeSrc);
+            }
+          }
+        });
+      } 
+      if (HTML5videos.length > 0){
+        HTML5videos.each(function(){
+          var video = $(this);
+          if(video.find("source[data-src]").length > 0){
+            video.find("source").each(function(){
+              if(!$(this).attr('src')){
+                $(this).attr('src',$(this).data('src'));
+              }
+            });
+            video[0].load();
+          }
+          if ($(element).hasClass('autoplay') || video.hasClass("autoplay") && video.closest(".slider li.selected").length){
+            video[0].play();
+          }
+        });
       }
     }
 
@@ -1361,16 +1472,14 @@ $(document).ready(function() { "use strict";
 
       var popupToHide = popupID ? popupID : window.popupShown.slice(-1)[0],
           $element = $('.popup.visible[data-popup-id="' + popupToHide + '"]'),
-          iframe = $element.find('iframe'),
+          iframe = $element.find('iframe[src]'),
           video = $element.find('video');
 
       //stop iframe autoplay
-      if (iframe.length > 0 ) {
+      if (iframe.length > 0 && ($element.hasClass('autoplay') || $element.find('iframe.autoplay').length)) {
         $(iframe).each(function(n, element){
-          var iframeSrc = $(element).attr('src'),
-              symbol = (iframeSrc.indexOf('?autoplay') > -1) ? "?" : "&";
-
-          $(element).attr('src', $(element).attr('src').replace(symbol+'autoplay=1',''));
+          var iframeSrc = $(element).attr('src').replace("?autoplay=1","?").replace("&autoplay=1","");
+          $(element).attr('src', iframeSrc);
         });
       }
 
@@ -1411,9 +1520,17 @@ $(document).ready(function() { "use strict";
 
   //Hide on body click
   if (window.hidePopupOnBodyClick){
+    var isPopupOnMousePressed = false;
+    $(document).on("mousedown", function (e){
+      if($(e.target).closest(".popupShown .popup .popupContent, .popupTrigger").length){
+        isPopupOnMousePressed = true; 
+      }else{
+        isPopupOnMousePressed = false;
+      }
+    });
     $(document).on('click', function (e){
       var container = $(".popupShown .popup .popupContent, .popupTrigger");
-      if (!container.is(e.target) && container.has(e.target).length === 0 && container.length > 0) {
+      if (!container.is(e.target) && container.has(e.target).length === 0 && container.length > 0 && !isPopupOnMousePressed && ($(e.target).closest(".dialog").length && $(e.target).closest(".popup").length!=0)!==false) {
         hidePopup();
       }
     });
@@ -1447,15 +1564,15 @@ $(document).ready(function() { "use strict";
       setTimeout(function(){
         $('.popupTrigger[data-popup-id="'+window.location.hash.split("#")[1]+'"]').click();
       }, 500);
-
-      $(window).on('popupHidden', function(){
-        if (history.pushState) {
-          window.history.pushState("", "", location.href.split('#')[0]);
-        } else {
-          window.location.hash = "";
-        }
-      });
     }
+
+    $(window).on('popupHidden', function(){
+      if (history.pushState) {
+        window.history.pushState("", "", location.href.split('#')[0]);
+      } else {
+        window.location.hash = "";
+      }
+    });
   }
 
 
@@ -1542,6 +1659,62 @@ $(document).ready(function() { "use strict";
 
 
   var sliderEl = $('.slider');
+  var sliderCounterController = function($sliderCounter, nextIndex, $slider){
+    if ($sliderCounter.length > 0){
+      $sliderCounter.each(function(){
+        var $sliderCounter = $(this);
+        $sliderCounter.find(".now").text(nextIndex+1);
+        $sliderCounter.find(".total").text($slider.children("li").length);
+      });
+    }
+  }
+  // stop playing videos in slider and start playing it in chosen slide if autoplay is set
+  var sliderStopAndPlayVideos = function ($slider,clickOnControl){
+    $slider.find('>li iframe').each(function(){
+      var iframeSrc = $(this).attr('src');
+      if(typeof(iframeSrc)=="string"){
+        if(iframeSrc.indexOf("autoplay")!=-1){
+          iframeSrc = iframeSrc.replace("?autoplay=1","?").replace("&autoplay=1","");
+          $(this).attr('src',iframeSrc);
+        }
+      }
+      iframeSrc = $(this).attr('data-src');
+      if(typeof(iframeSrc)=="string"){
+        if(iframeSrc.indexOf("autoplay")!=-1){
+          iframeSrc = iframeSrc.replace("?autoplay=1","?").replace("&autoplay=1","");
+          $(this).attr('data-src',iframeSrc);
+        }
+      }
+    });
+    $slider.find('>li video').each(function(){
+      $(this)[0].pause();
+      $(this)[0].currentTime = 0;
+    });
+    if($slider.closest(".popup").length==0 || clickOnControl){ // if slider is not in popup
+      // autoplay video in chosen slide
+      var iframe = $slider.find("li.selected iframe.autoplay");
+      if ( iframe.length > 0  ) {
+          var iframeSrc = iframe.attr('src') ? iframe.attr('src') : iframe.data('src'),
+              symbol = (iframeSrc.indexOf('?') > -1) ? "&" : "?";
+              if(iframeSrc.indexOf("autoplay")==-1){
+                iframe.attr("allow","autoplay");
+                iframe.attr('src',iframeSrc + symbol + "autoplay=1");
+              }
+        }
+      var video = $slider.find("li.selected video.autoplay");
+      if (video.length > 0){
+          if(video.find("source[data-src]").length > 0){
+            video.find("source").each(function(){
+              if(!$(this).attr('src')){
+                $(this).attr('src',$(this).data('src'));
+              }
+            });
+          }
+          video[0].load();
+          video[0].play();
+      }
+    }
+  }
 
   if ($(sliderEl).length > 0) {
 
@@ -1575,8 +1748,9 @@ $(document).ready(function() { "use strict";
       }
 
       //clickable
-      if ($el.hasClass('clickable') || $el.hasClass('autoplay')){
-        $el.on('click next', function(event){
+      if ($el.hasClass('clickable') || $el.hasClass('autoplay') || $el.hasClass('swipeable')){
+        // go to the next slide
+        $el.on('next', function(event){
 
           var $el = $(this),
               sliderID = $el.data('slider-id'),
@@ -1595,6 +1769,7 @@ $(document).ready(function() { "use strict";
                 $nextElement = $selected.nextOrFirst('li'),
                 nextIndex = $nextElement.index(),
                 $controller = $('.controller[data-slider-id="'+sliderID+'"]'),
+                $sliderCounter = $('.sliderCounter[data-slider-id="'+sliderID+'"]'),
                 isAnimated = $el.is('.animated, .animateOnEvent');
 
             //uselect old
@@ -1604,6 +1779,11 @@ $(document).ready(function() { "use strict";
 
             //select next
             $nextElement.removeClass('hide').addClass('selected');
+
+            // stop playing videos in slider and start playing it in chosen slide if autoplay is set
+            if($el.find('>li iframe.autoplay, >li video.autoplay')){
+              sliderStopAndPlayVideos($el, true);
+            }
 
             //set status
             if (window.sliderStatus) {
@@ -1629,6 +1809,9 @@ $(document).ready(function() { "use strict";
                 $controller.children('li:eq('+nextIndex+')').addClass('selected');
               });
             }
+
+            // if slider slides couter applied
+            sliderCounterController($sliderCounter, nextIndex, $el);
               
           });
 
@@ -1637,7 +1820,106 @@ $(document).ready(function() { "use strict";
             $html.removeClassByPrefix("slider_" + sliderID).addClass("slider_" + sliderID + "_" + nextIndex);
           }
         });
+
+        // go to the previous slide
+        $el.on('prev', function(event){
+
+          var $el = $(this),
+              sliderID = $el.data('slider-id'),
+              $slider = $('.slider[data-slider-id="'+sliderID+'"]'),
+              clickTarget = event.target;
+
+          //break
+          if($(clickTarget).data('slider-event') == "cancel") return;
+
+          //for multiple sliders
+          $slider.each(function(){
+
+            var $el = $(this),
+                sliderID = $el.data('slider-id'),
+                $selected = $el.children('.selected'),
+                $prevElement = $selected.prevOrLast('li'),
+                nextIndex = $prevElement.index(),
+                $controller = $('.controller[data-slider-id="'+sliderID+'"]'),
+                $sliderCounter = $('.sliderCounter[data-slider-id="'+sliderID+'"]'),
+                isAnimated = $el.is('.animated, .animateOnEvent');
+            //uselect old
+            $selected.removeClass('selected').addClass('hide').one('webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend', function() {
+              $(this).removeClass('hide');
+            });
+
+            //select next
+            $prevElement.removeClass('hide').addClass('selected');
+
+            // stop playing videos in slider and start playing it in chosen slide if autoplay is set
+            if($el.find('>li iframe.autoplay, >li video.autoplay')){
+              sliderStopAndPlayVideos($el, true);
+            }
+
+            //set status
+            if (window.sliderStatus) {
+              $html.removeClassByPrefix("slider_" + sliderID).addClass("slider_" + sliderID + "_" + nextIndex);
+            }
+
+            //animated
+            if (isAnimated) {
+              $el.addClass('animateOnEvent');
+              $el.find('li').removeClassByPrefix('ae-').removeClass('do');
+              $el.find('.selected').each(function(index){
+                $(this).removeClassByPrefix('ae-').removeClass('do').addClass('ae-' + (index + 1)).addClass('do');
+              });
+
+              $(window).scroll();
+            }
+
+            if (sliderID && $controller.length > 0){
+              $controller.each(function(){
+                var $controller = $(this);
+
+                $controller.children('.selected').removeClass('selected');
+                $controller.children('li:eq('+nextIndex+')').addClass('selected');
+              });
+            }
+
+            // if slider slides couter applied
+            sliderCounterController($sliderCounter, nextIndex, $el);
+              
+          });
+
+          //set status
+          if (window.sliderStatus) {
+            $html.removeClassByPrefix("slider_" + sliderID).addClass("slider_" + sliderID + "_" + nextIndex);
+          }
+        });
+
+        if ($el.hasClass('clickable') || $el.hasClass('autoplay')){
+          $el.on("click",function(){
+            $(this).trigger("next");
+          });
+        }
+
       }
+
+      // swipeable
+      if ($el.hasClass('swipeable')){
+        var swipeableMinDistance = 50;
+        // touch swipe
+        $el.swipe({
+          swipeStatus:function(event, phase, direction, distance){
+            if(phase=="end" && distance>swipeableMinDistance){
+              if(direction=="right"){
+                $el.trigger("prev");
+              }
+              if(direction=="left"){
+                $el.trigger("next");
+              }
+            }
+          },
+          maxTimeThreshold:0,
+          fingers:'all'
+        });
+      }
+
     });
   }
 
@@ -1654,7 +1936,8 @@ $(document).ready(function() { "use strict";
           nextIndex = $($controller.find(controllerSelector)).index($controllerElement),
           sliderId = $controller.data('slider-id'),
           $slider = $('.slider[data-slider-id="'+sliderId+'"]'),
-          $controllers = $('.controller[data-slider-id="'+sliderId+'"]');
+          $controllers = $('.controller[data-slider-id="'+sliderId+'"]'),
+          $sliderCounter = $('.sliderCounter[data-slider-id="'+sliderId+'"]');
 
       if (!$controllerElement.hasClass('selected')){
         $controllers.each(function(){
@@ -1669,11 +1952,17 @@ $(document).ready(function() { "use strict";
           var $slider = $(this),
               isAnimated = $slider.hasClass('animated');
 
+
           $slider.children('.selected').removeClass('selected').addClass('hide').one('webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend', function() {
             $(this).removeClass('hide');
           });
 
           $slider.children('li').eq(nextIndex).removeClass('hide').addClass('selected');
+
+          // stop playing videos in slider and start playing it in chosen slide if autoplay is set
+          if($slider.find('>li iframe.autoplay, >li video.autoplay')){
+            sliderStopAndPlayVideos($slider, false);
+          }
 
           //is animated
           if (isAnimated) {
@@ -1685,6 +1974,9 @@ $(document).ready(function() { "use strict";
 
             $(window).scroll();
           }
+
+          // if slider slides couter applied
+          sliderCounterController($sliderCounter, nextIndex, $slider);
         });
 
         //set status
@@ -1696,7 +1988,7 @@ $(document).ready(function() { "use strict";
   }
 
   //Next and prev buttons
-  $('[data-slider-action]').click(function(){
+  $(document).on('click', '[data-slider-action]', function(){
 
     if ($(this).data('slider-id')){
       var $this = $(this),
@@ -1704,7 +1996,8 @@ $(document).ready(function() { "use strict";
           sliderID = $this.data('slider-id'),
           action = $this.data('slider-action'),
           $slider = $('.slider[data-slider-id="' + sliderID + '"]'),
-          $controller = $('.controller[data-slider-id="'+sliderID+'"]');
+          $controller = $('.controller[data-slider-id="'+sliderID+'"]'),
+          $sliderCounter = $('.sliderCounter[data-slider-id="'+sliderID+'"]');
 
       //set status
       if (window.sliderStatus) {
@@ -1732,6 +2025,11 @@ $(document).ready(function() { "use strict";
         $selected.removeClass('selected');
         $desiredElement.removeClass('hide').addClass('selected');
 
+        // stop playing videos in slider and start playing it in chosen slide if autoplay is set
+        if($slider.find('>li iframe.autoplay, >li video.autoplay')){
+          sliderStopAndPlayVideos($slider,true);
+        }
+
         //is animated
         if (isAnimated) {
           $slider.addClass('animateOnEvent');
@@ -1741,6 +2039,9 @@ $(document).ready(function() { "use strict";
           });
           $(window).scroll();
         }
+
+        // if slider slides couter applied
+        sliderCounterController($sliderCounter, nextIndex, $slider);
       });
 
       $controller.each(function(){
@@ -1796,8 +2097,9 @@ $(document).ready(function() { "use strict";
 
 
   window.dropdownShown = false;
+  window.dropdownInterval = false;
   //click
-  $('.dropdownTrigger').on('click', function(){
+  $('body').on('click', '.dropdownTrigger', function(){
     showDropdown($(this));
   });
 
@@ -1817,11 +2119,37 @@ $(document).ready(function() { "use strict";
         dropdownID = $this.data('dropdown-id'),
         $element = $('.dropdown[data-dropdown-id="' + dropdownID + '"]'),
         elementPosition = $this.data('dropdown-position') ? $this.data('dropdown-position') : $element.attr('class'),
-        elementPosition = elementPosition.split(' ');
+        setPosition = $element.data('dropdown-set-position') == false ? false : true,
+        elementPosition = elementPosition.split(' '),
+        over = false;
 
+    if(typeof(window.dropdownInterval)=="number"){
+      clearInterval(window.dropdownInterval);
+    }
+    
     //hide
     if (!$isHover) {
       hideDropdown();
+    }else{
+      over = false;
+      $(document).mousemove(function(e){
+        if(
+          $(e.target).attr("data-dropdown-id")==dropdownID || 
+          $(e.target).closest(".dropdownTrigger.hover[data-dropdown-id="+dropdownID+"]").length ||
+          $(e.target).closest(".dropdown[data-dropdown-id="+dropdownID+"]").length
+        ){
+          over = true;
+        }else{
+          over = false;
+        }
+      });
+      // set interval to check, is mouse over dropdown or it's popup or not
+      window.dropdownInterval = setInterval(function(){
+        if(!over){
+          hideDropdown();
+          clearInterval(window.dropdownInterval);
+        }
+      },300);
     }
 
     //vertical position
@@ -1844,7 +2172,15 @@ $(document).ready(function() { "use strict";
       $element.removeClass('right left').addClass('center');
     }
 
-    $element.addClass('show').css('top',offsetY).css('left',offsetX);
+    if($element.hasClass("hide") && $element.hasClass("show")){
+      $element.removeClass("hide show");
+    }
+    
+    $element.addClass('show');
+
+    if (setPosition) {
+      $element.css('top',offsetY).css('left',offsetX);
+    }
     $html.addClass('dropdownShown dropdown_' + dropdownID);
     window.dropdownShown = true;
   }
@@ -1852,12 +2188,12 @@ $(document).ready(function() { "use strict";
   function hideDropdown(){
     //hide
     if (window.dropdownShown){
-      $html.removeClass('dropdownShown').removeClassByPrefix('dropdown_');
-      window.dropdownShown = false;
       hideDropdownOnScrollDelay = 0;
+      window.dropdownShown = false;
       $('.dropdown.show').addClass('hide').one('webkitTransitionEnd otransitionend msTransitionEnd transitionend', function(){
-        $(this).removeClass('show hide')
-        $html.removeClass('dropdownShown').removeClassByPrefix('dropdown_');;
+        $(this).removeClass('show hide');
+        $html.removeClass('dropdownShown').removeClassByPrefix('dropdown_');
+        //$html.removeClass('dropdownShown').removeClassByPrefix('dropdown_');
       });
       $(window).trigger('dropdownHidden');
     }
@@ -1961,102 +2297,194 @@ $(document).ready(function() { "use strict";
 *     Dialog Windows
 */
 
+  $.fn.slidesDialog = function( options ) {
+    // check if container for dialogs exists?
+    if($(document).find('.dialogContainer').length==0){
+      return false;
+    }
+  
+    // bind open/close methods to any element with data-dialog-action
+    if(options=="bindOpenCloseMethods"){
+      bindOpenCloseMethods($(this));
+      return false;
+    }
 
-  //show dialog message
-  $('.dialogTrigger[data-dialog-id]').on('click', function(){
-    var dialogID = $(this).data('dialog-id');
+    var dialogs = this;
+    // check if already exists?
+    if(dialogs.length==0){
+      if(options.id){
+        dialogs = $(document).find(".dialog[data-dialog-id="+options.id+"]");
+      }else{
+        alert("Error: you need to provide the 'id' property to create a dialog!");
+        return false;
+      }
+    }
 
-    window.showDialog(dialogID)
-  });
+    // start creating
+    if(dialogs.length){
+      dialogs.each(function(i, dialog){
+        if(typeof(options)!="string"){
+          init(dialog,options);
+        }else{
+          if(options=="open"){dialog.open(true);}
+          if(options=="close"){dialog.close();}
+        }
+      });
+    }else{
+      init(false,options);
+    }
 
+    // functions
+    // init
+    function init(el, options){
 
+      var settings = mergeSettings(el);
 
-  //reveal the dialog with ID
-  window.showDialog = function(id) {
+      // remove dialog if it's HTML was changed
+      if(el){
+        if(el.settings){
+          if(el.settings.template != settings.template){
+            $(el).remove();
+            el=false;
+          }
+        }
+      }
 
-    var dialogID = id,
-        $element = $('.dialog[data-dialog-id="' + dialogID + '"]');
+      // create dialog box if not exists
+      if(!el){
+        el = $(settings.template);
+        el.attr("data-dialog-id",settings.id);
+        $('.dialogContainer').prepend(el);
+        bindOpenCloseMethods(el.find('[data-dialog-action]'));
+        el = el[0];
+      }
 
-    if (!$element.is(':visible')){
-      $element.addClass('reveal').slideDown(500,function(){
-        $(this).removeClass('reveal').removeClass('hidden');
+      // store settings of an element inside it
+      el.settings = settings;
+
+      // bind methods
+      bindMethods(el);
+
+      // show dialog after initialization
+      if(settings.action!="close" && !settings.closeByCookie){
+        el.open();
+      }
+      // close dialog if cookie with it's id is set
+      if(settings.closeByCookie){
+        el.close();
+      }
+    
+      // open links in dialog
+      $(el).find("[data-href]").on('click', function(){
+        if ($(this).data('target')){
+          window.open($(this).data('href'), '_blank');
+        } else {
+          window.location = $(this).data('href');
+        }
+      });
+
+      // submit forms in dialog
+      $(el).find('[data-type="submit"]').click(function(){
+        $(this).parents('form').submit();
+      });
+
+      // Set cookie if data-dialog-cookie-age is set
+      if($(el).attr("data-dialog-cookie-age")!=undefined && el.settings.id){
+        var age = parseInt($(el).attr("data-dialog-cookie-age"));
+        $.cookie(el.settings.id,true,{expires:age,path:'/'});
+      }
+
+      return true;
+    };
+    // merge default, data-attributes set and provided options settings
+    function mergeSettings(el){
+      // default settings
+      var settings = {
+        template:'<div class="dialog hidden"><div class="close" data-dialog-action="close"></div><div class="dialogContent"><div class="text opacity-8">This popup was created with javascript. This is the default template. You can provide HTML code in the "template" property and it will be used as a Dialog box HTML.</div></div><ul><li data-dialog-action="close" class="indigo">Nice!</li></ul></div>', // the HTML code of a dialog box
+        action: "close", // open/close
+        id: false, // id of a dialog (need to be provided only if you create it via JS)
+        speed:500, // show / hide animation speed
+        openAfter:0, // delay before showing dialog
+        closeAfter:0, // hide dialog after X ms after showing
+        closeByCookie:false // close dialog if cookie with name = dialog-id is set
+      };
+      if(el){
+        if(el.settings){settings = el.settings;}
+        var $el = $(el);
+        if(Object.keys($el.data()).length){
+          // overwrite default settings to a data-attribes
+          if($el.attr("data-dialog-id")){settings.id=$el.attr("data-dialog-id");}
+          if($el.attr("data-dialog-action")){settings.action=$el.attr("data-dialog-action");}
+          if($el.attr("data-dialog-speed")){settings.speed=parseInt($el.attr("data-dialog-speed"));}
+          if($el.attr("data-dialog-open-delay")){settings.openAfter=parseInt($el.attr("data-dialog-open-delay"));}
+          if($el.attr("data-dialog-close-delay")){settings.closeAfter=parseInt($el.attr("data-dialog-close-delay"));}
+        }
+        if($.cookie($el.attr("data-dialog-id"))){
+          settings.closeByCookie = true;
+        }
+      }
+      // overwrite settings with provided options
+      settings = $.extend( {}, settings, options );
+      return settings;
+    };
+    // bind methods to each dialog box
+    function bindMethods(el){
+      var settings = el.settings;
+      // show
+      el.open=function(noDelay){
+        if(el.openTimeout){clearTimeout(el.openTimeout);}
+        if(el.closeTimeout){clearTimeout(el.closeTimeout);}
+        el.openTimeout = setTimeout(function(){
+          if (!$(el).is(':visible')){
+            $(el).addClass('reveal').slideDown(settings.speed,function(){
+              $(this).removeClass('reveal hidden');
+            });
+          }
+        },(noDelay)?0:settings.openAfter);
+        if(settings.closeAfter+settings.openAfter > settings.openAfter && !noDelay){
+          el.closeTimeout = setTimeout(function(){
+            el.close();
+          },settings.closeAfter + settings.openAfter);
+        }
+      };
+      // hide
+      el.close=function(){
+      if(el.openTimeout){clearTimeout(el.openTimeout);}
+        if(el.closeTimeout){clearTimeout(el.closeTimeout);}
+        if ($(el).is(':visible')){
+          $(el).addClass('hide').slideUp(settings.speed,function(){
+            $(this).removeClass('hide');
+          });
+        }
+      };
+    }
+
+    // bind open/close methods to any element with data-dialog-action and data-dialog-id provided
+    function bindOpenCloseMethods(el){
+      $(el).click(function(){
+        var action = $(this).attr("data-dialog-action"),
+            id = $(this).attr("data-dialog-id");
+        
+        if(id=="" || id==undefined){id=false;}
+         
+        if(action=="close"){
+          if(id && $(this).closest(".dialog").length==0){ // if element is OUTSIDE the dialog box
+            $(document).find(".dialog[data-dialog-id="+id+"]").slidesDialog("close");
+          }else{ // if element is INSIDE the dialog box
+            $(this).closest(".dialog").slidesDialog("close");
+          }
+        }else if(action="open" && id){
+           $(document).find(".dialog[data-dialog-id="+id+"]").slidesDialog("open");
+        }
       });
     }
+
   };
 
-  //hide dialog message
-  $('.dialog [data-dialog-action="close"], .dialog [data-dialog-action="hide"]').on('click', function(){
-    var $element = $(this).parents('.dialog'),
-        action = $(this).data('dialog-action'),
-        dialogID = $element.data('dialog-id'),
-        cookieAge = $element.data('set-cookie'),
-        cookieName = ($element.data('cookie-name')) ? $element.data('cookie-name') : dialogID,
-        cookieValue = ($element.data('cookie-value')) ? $element.data('cookie-value') : true,
-        cookiePath = $element.data('cookie-path');
-
-    $element.addClass('hide').slideUp(500,function(){
-      $(this).removeClass('hide');
-
-      if (cookieAge && action == "close"){
-        $.cookie(cookieName, cookieValue, { expires: cookieAge, path: cookiePath });
-      }
-    });
-  });
-
-  //hide dialog message with cookie
-  $('.dialog[data-set-cookie]').each(function(index, element) {
-    var dialogID = $(element).data('dialog-id'),
-        cookieName = ($(element).data('cookie-name')) ? $(element).data('cookie-name') : dialogID,
-        cookieValue = ($(element).data('cookie-value')) ? $(element).data('cookie-value') : true;
-
-    if ($.cookie(cookieName)){
-      $(element).hide();
-    }
-  });
-
-  //links
-  $('.dialog [data-href]').on('click', function(){
-    if ($(this).data('target')){
-      window.open($(this).data('href'), '_blank');
-    } else {
-      window.location = $(this).data('href');
-    }
-  });
-
-  //delay reveal for dialog window
-  $('.dialog.hidden[data-dialog-delay]').each(function(){
-    var timeoutDelay = parseFloat($(this).attr('data-dialog-delay')),
-        $element = $(this);
-
-    if (!isNaN(timeoutDelay)) {
-      setTimeout(function(){
-        $element.addClass('reveal').slideDown(500,function(){
-          $(this).removeClass('reveal').removeClass('hidden');
-        });
-      }, timeoutDelay);
-    }
-  });
-
-  //delay reveal for dialog window
-  $('.dialog[data-dialog-hide-delay]').each(function(){
-    var timeoutDelay = parseFloat($(this).attr('data-dialog-hide-delay')),
-        $element = $(this);
-
-    if (!isNaN(timeoutDelay)) {
-      setTimeout(function(){
-        $element.addClass('hide').slideUp(500,function(){
-          $(this).removeClass('hide');
-        });
-      }, timeoutDelay);
-    }
-  });
-
-  //submit form
-  $('.dialog [data-type="submit"]').click(function(){
-    $(this).parents('form').submit();
-  });
-
-
+  // Initialize any element in HTML with .dialog class and data-dialog-id attribute
+  $(".dialog[data-dialog-id]").slidesDialog();
+  // Bind open/close methods to each element
+  $(document).find('[data-dialog-action]:not(.dialog)').slidesDialog("bindOpenCloseMethods");
 
 
 /***
@@ -2171,25 +2599,12 @@ $(document).ready(function() { "use strict";
 window.isMobile = false;
 if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) { window.isMobile = true; }
 
-//Check for Touch Events
-if (window.PointerEvent && ('maxTouchPoints' in navigator)) {
-  if (navigator.maxTouchPoints > 0) {
-    window.isMobile = true;
-  }
-} else {
-  if (window.matchMedia && window.matchMedia("(any-pointer:coarse)").matches) {
-    window.isMobile = true;
-  } else if (window.TouchEvent || ('ontouchstart' in window)) {
-    window.isMobile = true;
-  }
-}
-
 //Detect Browser
 window.isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 window.isSafari = /^((?!chrome).)*safari/i.test(navigator.userAgent);
 window.isChrome = /chrom(e|ium)/.test(navigator.userAgent.toLowerCase());
 window.isChromeiOS = navigator.userAgent.match('CriOS');
-window.isMSIE = navigator.userAgent.match('MSIE');
+window.isMSIE = navigator.userAgent.match('MSIE') || navigator.userAgent.match("Windows NT") && navigator.userAgent.match("rv:11.0");
 window.isEdge = navigator.userAgent.match('Edge');
 window.isAndroid = navigator.userAgent.toLowerCase().indexOf("android") > -1;
 window.isiPad = navigator.userAgent.match(/iPad/i) !== null;
@@ -2198,6 +2613,9 @@ window.isiPad = navigator.userAgent.match(/iPad/i) !== null;
 window.isWindows = navigator.platform.toUpperCase().indexOf('WIN')!==-1;
 window.isOSX = navigator.platform.toUpperCase().indexOf('MAC')!==-1;
 window.isLinux = navigator.platform.toUpperCase().indexOf('LINUX')!==-1;
+
+//iOS13+ Devices with "Request Desktop Website" setting
+if (window.isOSX && navigator.maxTouchPoints) window.isMobile = true;
 
 //Prepare for CSS Fixes
 if (window.isSafari){$html.addClass('safari');}
@@ -2213,17 +2631,8 @@ if (window.isLinux){$html.addClass('linux');}
 //Detect Mobile
 if(window.isMobile){$html.addClass('mobile');}else{$html.addClass('desktop');}
 
-//Prepare for CSS Fixes
-if (window.isSafari){$html.addClass('safari');}
-if (window.isFirefox){$html.addClass('firefox');}
-if (window.isChrome){$html.addClass('chrome');}
-if (window.isMSIE){$html.addClass('msie');}
-if (window.isEdge){$html.addClass('edge');}
-if (window.isAndroid){$html.addClass('android');}
-if (window.isWindows){$html.addClass('windows');}
-if (window.isOSX){$html.addClass('osx');}
-if (window.isLinux){$html.addClass('linux');}
-
 //Retina
 window.isRetina = ((window.matchMedia && (window.matchMedia('only screen and (min-resolution: 124dpi), only screen and (min-resolution: 1.3dppx), only screen and (min-resolution: 48.8dpcm)').matches || window.matchMedia('only screen and (-webkit-min-device-pixel-ratio: 1.3), only screen and (-o-min-device-pixel-ratio: 2.6/2), only screen and (min--moz-device-pixel-ratio: 1.3), only screen and (min-device-pixel-ratio: 1.3)').matches)) || (window.devicePixelRatio && window.devicePixelRatio > 1.3));
-if (window.isRetina){$html.addClass('retina');};
+if (window.isRetina) {
+    $html.addClass('retina');
+}
